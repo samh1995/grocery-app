@@ -1,12 +1,16 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useRouter } from 'next/navigation'
 
 const CUISINES = ['Italian', 'South Asian', 'Middle Eastern', 'East Asian', 'Caribbean', 'Latin American', 'African', 'Mediterranean', 'American', 'Japanese', 'Mexican']
 const DIETARY = ['Balanced', 'Protein-heavy', 'Low carb', 'Vegetarian', 'Vegan', 'Halal', 'Gluten-free']
 const ALLERGIES = ['None', 'Nuts', 'Dairy', 'Gluten', 'Shellfish', 'Eggs', 'Soy']
 
 export default function Onboarding() {
+  const router = useRouter()
+  const [user, setUser] = useState(null)
+  const [checkingAuth, setCheckingAuth] = useState(true)
   const [step, setStep] = useState(1)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
@@ -23,6 +27,31 @@ export default function Onboarding() {
     wantToGrow: ''
   })
 
+  // Check if user is logged in
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/auth')
+        return
+      }
+      setUser(session.user)
+
+      // Check if they already completed onboarding
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single()
+
+      if (profile) {
+        setDone(true)
+      }
+      setCheckingAuth(false)
+    }
+    checkUser()
+  }, [router])
+
   const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
 
   const toggleArray = (field, value) => {
@@ -37,6 +66,7 @@ export default function Onboarding() {
   const handleSubmit = async () => {
     setLoading(true)
     const { error } = await supabase.from('user_profiles').insert([{
+      user_id: user.id,
       name: form.name,
       household_size: form.householdSize,
       dietary_style: form.dietaryStyle.join(', '),
@@ -57,15 +87,33 @@ export default function Onboarding() {
     }
   }
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/auth')
+  }
+
   const progress = (step / 4) * 100
+
+  // Show nothing while checking auth
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400">Loading...</p>
+      </div>
+    )
+  }
 
   if (done) {
     return (
       <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-sm p-8 text-center">
           <div className="text-5xl mb-4">🎉</div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">You're all set, {form.name}!</h1>
-          <p className="text-gray-500">Your personalized deal feed is coming soon. We'll match the best grocery deals in Toronto to your preferences.</p>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">You're all set{form.name ? `, ${form.name}` : ''}!</h1>
+          <p className="text-gray-500 mb-6">Your personalized deal feed is coming soon. We'll match the best grocery deals in Toronto to your preferences.</p>
+          <button onClick={handleLogout}
+            className="text-sm text-gray-400 hover:text-gray-600 underline">
+            Log out
+          </button>
         </div>
       </div>
     )
