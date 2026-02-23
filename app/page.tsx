@@ -104,17 +104,10 @@ export default function Onboarding() {
   }
 
   if (done) {
+    router.push('/feed')
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4">
-        <div className="w-full max-w-md bg-white rounded-2xl shadow-sm p-8 text-center">
-          <div className="text-5xl mb-4">🎉</div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">You're all set{form.name ? `, ${form.name}` : ''}!</h1>
-          <p className="text-gray-500 mb-6">Your personalized deal feed is coming soon. We'll match the best grocery deals in Toronto to your preferences.</p>
-          <button onClick={handleLogout}
-            className="text-sm text-gray-400 hover:text-gray-600 underline">
-            Log out
-          </button>
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400">Loading your deals...</p>
       </div>
     )
   }
