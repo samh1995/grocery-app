@@ -38,7 +38,8 @@ export async function GET(request: NextRequest) {
   // Auth check (skip in development)
   if (process.env.NODE_ENV !== "development") {
     const secret = request.headers.get("x-sync-secret");
-    if (!secret || secret !== process.env.SYNC_SECRET) {
+    const isCron = request.headers.get("x-vercel-cron") === "1";
+    if (!isCron && (!secret || secret !== process.env.SYNC_SECRET)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
   }
