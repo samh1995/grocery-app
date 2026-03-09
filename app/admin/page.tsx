@@ -23,9 +23,9 @@ export default function AdminPage() {
     valid_to: ''
   })
 
-  const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }))
+  const update = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }))
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setSaved(false)

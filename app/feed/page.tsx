@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation'
 
 export default function FeedPage() {
   const router = useRouter()
-  const [user, setUser] = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [deals, setDeals] = useState([])
+  const [user, setUser] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [deals, setDeals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('All')
 
@@ -40,7 +40,7 @@ export default function FeedPage() {
     load()
   }, [router])
 
-  const getDiscount = (sale, regular) => {
+  const getDiscount = (sale: number, regular: number) => {
     if (!regular || !sale) return null
     return Math.round(((regular - sale) / regular) * 100)
   }
@@ -48,7 +48,7 @@ export default function FeedPage() {
   const stores = ['All', ...new Set(deals.map(d => d.store))]
   const filtered = filter === 'All' ? deals : deals.filter(d => d.store === filter)
 
-  const grouped = filtered.reduce((acc, deal) => {
+  const grouped = filtered.reduce((acc: Record<string, any[]>, deal: any) => {
     const cat = deal.category || 'Other'
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(deal)
@@ -107,7 +107,7 @@ export default function FeedPage() {
               <div key={category} className="mb-6">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{category}</h2>
                 <div className="space-y-3">
-                  {catDeals.map(deal => {
+                  {(catDeals as any[]).map((deal: any) => {
                     const discount = getDiscount(deal.sale_price, deal.regular_price)
                     return (
                       <div key={deal.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
