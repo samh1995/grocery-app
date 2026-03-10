@@ -1,6 +1,8 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
+import { filterDeals } from '../../lib/dealFilters'
+import { tagDeal, getCategories } from '../../lib/categoryTagger'
 import { useRouter } from 'next/navigation'
 
 export default function FeedPage() {
@@ -9,7 +11,8 @@ export default function FeedPage() {
   const [profile, setProfile] = useState<any>(null)
   const [deals, setDeals] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('All')
+  const [storeFilter, setStoreFilter] = useState('All')
+  const [categoryFilter, setCategoryFilter] = useState('All')
 
   useEffect(() => {
     const load = async () => {
@@ -34,7 +37,24 @@ export default function FeedPage() {
         .gte('valid_to', today)
         .order('category')
 
-      setDeals(dealData || [])
+      const filtered = filterDeals(dealData || [], prof)
+
+      // Tag each deal with categories
+      const tagged = filtered.map(d => ({ ...d, _categories: tagDeal(d) }))
+
+      // Log category coverage
+      const catCounts: Record<string, number> = {}
+      for (const d of tagged) {
+        for (const c of d._categories) {
+          catCounts[c] = (catCounts[c] || 0) + 1
+        }
+      }
+      console.log(`Total deals: ${tagged.length}`)
+      console.log('Category counts:', catCounts)
+      console.log(`Other: ${catCounts['Other'] || 0}`)
+      console.log('Other deals:', tagged.filter(d => d._categories.includes('Other')).map(d => d.product_name))
+
+      setDeals(tagged)
       setLoading(false)
     }
     load()
@@ -46,14 +66,44 @@ export default function FeedPage() {
   }
 
   const stores = ['All', ...new Set(deals.map(d => d.store))]
-  const filtered = filter === 'All' ? deals : deals.filter(d => d.store === filter)
+
+  // Categories that have at least 1 deal
+  const activeCategories = useMemo(() => {
+    const allCats = getCategories()
+    const present = new Set<string>()
+    for (const d of deals) {
+      for (const c of d._categories) present.add(c)
+    }
+    return ['All', ...allCats.filter(c => present.has(c))]
+  }, [deals])
+
+  // Apply both filters (AND logic)
+  const filtered = useMemo(() => {
+    let result = deals
+    if (storeFilter !== 'All') {
+      result = result.filter(d => d.store === storeFilter)
+    }
+    if (categoryFilter !== 'All') {
+      result = result.filter(d => d._categories.includes(categoryFilter))
+    }
+    return result
+  }, [deals, storeFilter, categoryFilter])
 
   const grouped = filtered.reduce((acc: Record<string, any[]>, deal: any) => {
-    const cat = deal.category || 'Other'
-    if (!acc[cat]) acc[cat] = []
-    acc[cat].push(deal)
+    const cats: string[] = deal._categories
+    for (const cat of cats) {
+      if (categoryFilter !== 'All' && cat !== categoryFilter) continue
+      if (!acc[cat]) acc[cat] = []
+      acc[cat].push(deal)
+    }
     return acc
   }, {})
+
+  // Sort groups by category order
+  const categoryOrder = getCategories()
+  const sortedGroups = Object.entries(grouped).sort(
+    (a, b) => categoryOrder.indexOf(a[0]) - categoryOrder.indexOf(b[0])
+  )
 
   if (loading) {
     return (
@@ -83,9 +133,9 @@ export default function FeedPage() {
       <div className="px-4 py-3 overflow-x-auto">
         <div className="max-w-lg mx-auto flex gap-2">
           {stores.map(s => (
-            <button key={s} onClick={() => setFilter(s)}
+            <button key={s} onClick={() => setStoreFilter(s)}
               className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                filter === s
+                storeFilter === s
                   ? 'bg-green-500 text-white'
                   : 'bg-white border border-gray-200 text-gray-600 hover:border-green-300'
               }`}>
@@ -95,15 +145,31 @@ export default function FeedPage() {
         </div>
       </div>
 
+      {/* Category Filter */}
+      <div className="px-4 pb-3 overflow-x-auto">
+        <div className="max-w-lg mx-auto flex gap-2">
+          {activeCategories.map(c => (
+            <button key={c} onClick={() => setCategoryFilter(c)}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                categoryFilter === c
+                  ? 'bg-green-500 text-white'
+                  : 'bg-white border border-gray-200 text-gray-600 hover:border-green-300'
+              }`}>
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Deals */}
       <div className="px-4 pb-8">
         <div className="max-w-lg mx-auto">
-          {Object.keys(grouped).length === 0 ? (
+          {sortedGroups.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-400">No deals this week. Check back soon!</p>
             </div>
           ) : (
-            Object.entries(grouped).map(([category, catDeals]) => (
+            sortedGroups.map(([category, catDeals]) => (
               <div key={category} className="mb-6">
                 <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">{category}</h2>
                 <div className="space-y-3">
